@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yogi Suria - Portfolio</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@18.2.0",
+        "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+        "lucide-react": "https://esm.sh/lucide-react"
+      }
+    }
+    </script>
+    
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <style>
+        /* Custom scrollbar hiding if needed */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-black text-white">
+    <div id="root"></div>
+
+    <script type="text/babel" data-type="module">
+        import React, { useState, useEffect, useRef } from 'react';
+        import { createRoot } from 'react-dom/client';
+        import { ArrowUpRight, Mail, Linkedin, Twitter, Download, Menu, X, ChevronDown, Volume2, VolumeX } from 'lucide-react';
+
+        // --- RIPPLE EFFECT COMPONENT ---
+        const RippleEffect = () => {
+          useEffect(() => {
+            let renderer, scene, camera, simScene, simMaterial, renderMaterial;
+            let rtA, rtB;
+            let mouse = new window.THREE.Vector2();
+            let frame = 0;
+            let animationId;
+            let width, height;
+
+            // Load Three.js dynamically
+            const script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
+            script.async = true;
+            
+            script.onload = () => {
+              const THREE = window.THREE;
+              mouse = new THREE.Vector2();
+
+              const simulationVertexShader = `
+                varying vec2 vUv;
+                void main() {
+                    vUv = uv;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+              `;
+
+              const simulationFragmentShader = `
+                uniform sampler2D textureA;
+                uniform vec2 mouse;
+                uniform vec2 resolution;
+                uniform float time;
+                uniform int frame;
+                varying vec2 vUv;
+
+                const float delta = 1.4;  
+
+                void main() {
+                    vec2 uv = vUv;
+                    if (frame == 0) {
+                        gl_FragColor = vec4(0.0);
+                        return;
+                    }
+                    
+                    vec4 data = texture2D(textureA, uv);
+                    float pressure = data.x;
+                    float pVel = data.y;
+                    
+                    vec2 texelSize = 1.0 / resolution;
+                    float p_right = texture2D(textureA, uv + vec2(texelSize.x, 0.0)).x;
+                    float p_left = texture2D(textureA, uv + vec2(-texelSize.x, 0.0)).x;
+                    float p_up = texture2D(textureA, uv + vec2(0.0, texelSize.y)).x;
+                    float p_down = texture2D(textureA, uv + vec2(0.0, -texelSize.y)).x;
+                    
+                    if (uv.x <= texelSize.x) p_left = p_right;
+                    if (uv.x >= 1.0 - texelSize.x) p_right = p_left;
+                    if (uv.y <= texelSize.y) p_down = p_up;
+                    if (uv.y >= 1.0 - texelSize.y) p_up = p_down;
+                    
+                    pVel += delta * (-2.0 * pressure + p_right + p_left) / 4.0;
+                    pVel += delta * (-2.0 * pressure + p_up + p_down) / 4.0;
+                    
+                    pressure += delta * pVel;
+                    
+                    pVel -= 0.005 * delta * pressure;
+                    
+                    pVel *= 1.0 - 0.018 * delta; 
+                    pressure *= 0.990;           
+                    
+                    vec2 mouseUV = mouse / resolution;
+                    if(mouse.x > 0.0) {
+                        float dist = distance(uv, mouseUV);
+                        if(dist <= 0.02) {
+                            pressure += 2.0 * (1.0 - dist / 0.02);
+                        }
+                    }
+                    
+                    gl_FragColor = vec4(pressure, pVel, 
+                        (p_right - p_left) / 2.0, 
+                        (p_up - p_down) / 2.0);
+                }
+              `;
+
+              const renderVertexShader = `
+                varying vec2 vUv;
+                void main() {
+                    vUv = uv;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+              `;
+
+              const renderFragmentShader = `
+                uniform sampler2D textureA;
+                uniform sampler2D textureB;
+                varying vec2 vUv;
+
+                void main() {
+                    vec4 data = texture2D(textureA, vUv);
+                    vec2 distortion = 0.3 * data.zw;
+                    vec4 color = texture2D(textureB, vUv + distortion);
+                    vec3 normal = normalize(vec3(-data.z * 2.0, 0.5, -data.w * 2.0));
+                    vec3 lightDir = normalize(vec3(-3.0, 10.0, 3.0));
+                    float specular = pow(max(0.0, dot(normal, lightDir)), 60.0) * 1.5;
+                    gl_FragColor = color + vec4(specular);
+                }
+              `;
+
+              width = window.innerWidth * window.devicePixelRatio;
+              height = window.innerHeight * window.devicePixelRatio;
+
+              scene = new THREE.Scene();
+              simScene = new THREE.Scene();
+              camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+
+              renderer = new THREE.WebGLRenderer({
+                antialias: true,
+                alpha: true,
+                preserveDrawingBuffer: true,
+              });
+              renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+              renderer.setSize(window.innerWidth, window.innerHeight);
+              renderer.setClearColor(0x000000, 0);
+              
+              renderer.domElement.style.position = 'fixed';
+              renderer.domElement.style.top = '0';
+              renderer.domElement.style.left = '0';
+              renderer.domElement.style.width = '100vw';
+              renderer.domElement.style.height = '100vh';
+              renderer.domElement.style.pointerEvents = 'none';
+              renderer.domElement.style.zIndex = '9000';
+              
+              document.body.appendChild(renderer.domElement);
+
+              const options = {
+                format: THREE.RGBAFormat,
+                type: THREE.FloatType,
+                minFilter: THREE.LinearFilter,
+                magFilter: THREE.LinearFilter,
+                stencilBuffer: false,
+                depthBuffer: false,
+              };
+              
+              rtA = new THREE.WebGLRenderTarget(width, height, options);
+              rtB = new THREE.WebGLRenderTarget(width, height, options);
+
+              simMaterial = new THREE.ShaderMaterial({
+                uniforms: {
+                  textureA: { value: null },
+                  mouse: { value: new THREE.Vector2(0, 0) },
+                  resolution: { value: new THREE.Vector2(width, height) },
+                  time: { value: 0 },
+                  frame: { value: 0 },
+                },
+                vertexShader: simulationVertexShader,
+                fragmentShader: simulationFragmentShader,
+              });
+
+              renderMaterial = new THREE.ShaderMaterial({
+                uniforms: {
+                  textureA: { value: null },
+                  textureB: { value: null },
+                },
+                vertexShader: renderVertexShader,
+                fragmentShader: renderFragmentShader,
+                transparent: true,
+              });
+
+              const plane = new THREE.PlaneGeometry(2, 2);
+              const simQuad = new THREE.Mesh(plane, simMaterial);
+              const renderQuad = new THREE.Mesh(plane, renderMaterial);
+
+              simScene.add(simQuad);
+              scene.add(renderQuad);
+
+              const canvas = document.createElement("canvas");
+              canvas.width = width;
+              canvas.height = height;
+              const ctx = canvas.getContext("2d", { alpha: true });
+              ctx.clearRect(0, 0, width, height);
+              
+              const textTexture = new THREE.CanvasTexture(canvas);
+              textTexture.minFilter = THREE.LinearFilter;
+              textTexture.magFilter = THREE.LinearFilter;
+              textTexture.format = THREE.RGBAFormat;
+
+              const onResize = () => {
+                const newWidth = window.innerWidth * window.devicePixelRatio;
+                const newHeight = window.innerHeight * window.devicePixelRatio;
+
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                rtA.setSize(newWidth, newHeight);
+                rtB.setSize(newWidth, newHeight);
+                simMaterial.uniforms.resolution.value.set(newWidth, newHeight);
+
+                canvas.width = newWidth;
+                canvas.height = newHeight;
+                ctx.clearRect(0, 0, newWidth, newHeight);
+                textTexture.needsUpdate = true;
+              };
+
+              const onMouseMove = (e) => {
+                mouse.x = e.clientX * window.devicePixelRatio;
+                mouse.y = (window.innerHeight - e.clientY) * window.devicePixelRatio;
+                if(simMaterial) simMaterial.uniforms.mouse.value.set(mouse.x, mouse.y);
+              };
+
+              const onTouchMove = (e) => {
+                if (e.touches.length > 0) {
+                  const touch = e.touches[0];
+                  mouse.x = touch.clientX * window.devicePixelRatio;
+                  mouse.y = (window.innerHeight - touch.clientY) * window.devicePixelRatio;
+                  if(simMaterial) simMaterial.uniforms.mouse.value.set(mouse.x, mouse.y);
+                }
+              };
+
+              window.addEventListener('resize', onResize);
+              window.addEventListener('mousemove', onMouseMove);
+              window.addEventListener('touchmove', onTouchMove, { passive: true });
+
+              const animate = () => {
+                simMaterial.uniforms.frame.value = frame++;
+                simMaterial.uniforms.time.value = performance.now() / 1000;
+
+                simMaterial.uniforms.textureA.value = rtA.texture;
+                renderer.setRenderTarget(rtB);
+                renderer.render(simScene, camera);
+
+                renderMaterial.uniforms.textureA.value = rtB.texture;
+                renderMaterial.uniforms.textureB.value = textTexture;
+                renderer.setRenderTarget(null);
+                renderer.render(scene, camera);
+
+                const temp = rtA;
+                rtA = rtB;
+                rtB = temp;
+
+                animationId = requestAnimationFrame(animate);
+              };
+
+              animate();
+            };
+
+            document.body.appendChild(script);
+
+            return () => {
+              document.body.removeChild(script);
+              if (renderer && renderer.domElement) {
+                document.body.removeChild(renderer.domElement);
+                renderer.dispose();
+              }
+              if (animationId) cancelAnimationFrame(animationId);
+            };
+          }, []);
+
+          return null;
+        };
+
+        // --- MAIN APP ---
+        const App = () => {
+          const [isScrolled, setIsScrolled] = useState(false);
+          const [scrollY, setScrollY] = useState(0);
+          const [mousePos, setMousePos] = useState({ x: 0, y: 0 }); 
+          const [cursorPos, setCursorPos] = useState({ x: 0, y: 0 }); 
+          const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+          const [activeProject, setActiveProject] = useState(0); 
+          const [isMuted, setIsMuted] = useState(true); 
+          const [isBioExpanded, setIsBioExpanded] = useState(false);
+          
+          const bioRef = useRef(null); 
+          const paintingRefs = useRef({}); 
+          const lastTrailPos = useRef({ x: 0, y: 0 });
+          const trailIndex = useRef(0);
+
+          const [trail, setTrail] = useState([]);
+          const [particles, setParticles] = useState([]);
+
+          const [artists, setArtists] = useState([]);
+          const [matches, setMatches] = useState({}); 
+          const [draggedArtist, setDraggedArtist] = useState(null);
+          const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+          const [highestZ, setHighestZ] = useState(20);
+          const [hoveredMatchId, setHoveredMatchId] = useState(null);
+          const [gameComplete, setGameComplete] = useState(false);
+
+          const trailImages = [
+            "https://images.pexels.com/photos/159862/art-school-of-athens-raphael-italian-painter-fresco-159862.jpeg?auto=compress&cs=tinysrgb&dpr=1&w=500",
+            "https://cdn.britannica.com/24/189624-050-F3C5BAA9/Mona-Lisa-oil-wood-panel-Leonardo-da.jpg",
+            "https://artincontext.org/wp-content/uploads/2021/06/High-Renaissance.jpg",
+            "https://eii38vo2nqq.exactdn.com/web/app/uploads/2022/02/Basso-Rinascimento.jpg?strip=all&lossy=1&ssl=1",
+            "https://kmska.be/_next/image?url=https%3A%2F%2Fproductionbackend.kmska.be%2Fsites%2Fdefault%2Ffiles%2Fstyles%2Flandscape%2Fpublic%2F2021-11%2Frubens-jan-gaspard-gevartius-kmska.jpg%3Fh%3D0da0242e%26itok%3DTVSMUcf-&w=3840&q=75",
+            "https://images.pexels.com/photos/159862/art-school-of-athens-raphael-italian-painter-fresco-159862.jpeg?auto=compress&cs=tinysrgb&dpr=1&w=500",
+            "https://cdn.britannica.com/24/189624-050-F3C5BAA9/Mona-Lisa-oil-wood-panel-Leonardo-da.jpg",
+            "https://artincontext.org/wp-content/uploads/2021/06/High-Renaissance.jpg",
+            "https://eii38vo2nqq.exactdn.com/web/app/uploads/2022/02/Basso-Rinascimento.jpg?strip=all&lossy=1&ssl=1",
+            "https://kmska.be/_next/image?url=https%3A%2F%2Fproductionbackend.kmska.be%2Fsites%2Fdefault%2Ffiles%2Fstyles%2Flandscape%2Fpublic%2F2021-11%2Frubens-jan-gaspard-gevartius-kmska.jpg%3Fh%3D0da0242e%26itok%3DTVSMUcf-&w=3840&q=75"
+          ];
+
+          const initialPaintings = [
+            { id: 'p1', matchId: 1, src: "https://images.pexels.com/photos/159862/art-school-of-athens-raphael-italian-painter-fresco-159862.jpeg?auto=compress&cs=tinysrgb&dpr=1&w=500", label: "The School of Athens", summary: "This masterpiece represents Philosophy. It gathers the greatest minds of antiquity, including Plato and Aristotle, in a grand architectural setting." },
+            { id: 'p2', matchId: 2, src: "https://cdn.britannica.com/24/189624-050-F3C5BAA9/Mona-Lisa-oil-wood-panel-Leonardo-da.jpg", label: "Mona Lisa", summary: "The archetype of the Renaissance portrait. Famous for her enigmatic smile and the masterful use of sfumato that softens the transition between colors." },
+            { id: 'p3', matchId: 3, src: "https://artincontext.org/wp-content/uploads/2021/06/High-Renaissance.jpg", label: "Creation of Adam", summary: "The most iconic fresco of the Sistine Chapel ceiling. It captures the moment God breathes life into Adam, their fingers almost touching." },
+            { id: 'p4', matchId: 4, src: "https://eii38vo2nqq.exactdn.com/web/app/uploads/2022/02/Basso-Rinascimento.jpg?strip=all&lossy=1&ssl=1", label: "Renaissance Masterpiece", summary: "A stunning example of Florentine art, celebrated for its delicate lines, mythological symbolism, and ethereal beauty." },
+            { id: 'p5', matchId: 5, src: "https://kmska.be/_next/image?url=https%3A%2F%2Fproductionbackend.kmska.be%2Fsites%2Fdefault%2Ffiles%2Fstyles%2Flandscape%2Fpublic%2F2021-11%2Frubens-jan-gaspard-gevartius-kmska.jpg%3Fh%3D0da0242e%26itok%3DTVSMUcf-&w=3840&q=75", label: "Portrait of Gevartius", summary: "A vivid portrait of the scholar Jan Caspar Gevartius. It demonstrates the artist's incredible ability to render skin tones and intellectual depth." },
+          ];
+
+          const initialArtists = [
+            { id: 'a1', matchId: 1, src: "https://upload.wikimedia.org/wikipedia/commons/f/f6/Raffaello_Sanzio.jpg", label: "Raphael", desc: "High Renaissance Master" },
+            { id: 'a2', matchId: 2, src: "https://upload.wikimedia.org/wikipedia/commons/b/ba/Leonardo_self.jpg", label: "Leonardo da Vinci", desc: "Polymath & Painter" },
+            { id: 'a3', matchId: 3, src: "https://upload.wikimedia.org/wikipedia/commons/0/02/Michelangelo_Daniele_da_Volterra_%28dettaglio%29.jpg", label: "Michelangelo", desc: "Sculptor & Painter" },
+            { id: 'a4', matchId: 4, src: "https://upload.wikimedia.org/wikipedia/commons/d/d4/Sandro_Botticelli_083.jpg", label: "Sandro Botticelli", desc: "Early Renaissance" },
+            { id: 'a5', matchId: 5, src: "https://d3vjn2zm46gms2.cloudfront.net/blogs/2014/10/27010656/peter-paul-rubens-facts-secrets.jpg", label: "Peter Paul Rubens", desc: "Flemish Baroque" },
+          ];
+
+          const contactData = {
+            email: "reachout@yogindersuria.live",
+            twitter: "https://x.com/suriagraphics",
+            linkedin: "https://www.linkedin.com/in/yogi-suria-a8b787316/",
+            location: "India"
+          };
+
+          const projects = [
+            {
+              id: 1,
+              title: "P2P.org",
+              category: "Brand and Motion Design",
+              description: "Contributed to brand design efforts across social media, motion graphics, and client offers during a period when the company surpassed $10B in TVL.",
+              stats: "$10B+ TVL",
+              image: "https://framerusercontent.com/images/c2fFBSMJhNsXno07r9aLiE9IGwM.png?width=1633&height=1633",
+              url: "https://www.p2p.org/"
+            },
+            {
+              id: 2,
+              title: "Kelp DAO",
+              category: "Brand and Motion Design",
+              description: "Contributed to brand and motion design initiatives during a growth phase where Kelp DAO's TVL increased from $900M to over $1.2B. Produced video assets for partnerships.",
+              stats: "$1.2B TVL",
+              image: "https://www.nftgators.com/wp-content/uploads/2024/05/Kelp-DAO.png",
+              url: "https://kerneldao.com/kelp/"
+            },
+            {
+              id: 3,
+              title: "Blockwiz",
+              category: "UIUX Design",
+              description: "Led the redesign of 40+ landing pages within just two months, contributing to generating over $250K in revenue.",
+              stats: "$250K+ Revenue",
+              image: "https://framerusercontent.com/images/4quSKwxzYwx7ZZGy47KRCIGJM.png?width=1633&height=1633",
+              url: "https://www.linkedin.com/company/blockwiz/"
+            },
+            {
+              id: 4,
+              title: "Bitfinity Network",
+              category: "Graphic Design",
+              description: "Supported marketing efforts as a generalist designer during their $7M+ fundraising phase, working across motion and 3D.",
+              stats: "$7M+ Raised",
+              image: "https://framerusercontent.com/images/MP5IlCLDqUYkSeHrfqc2RAspM.png?width=1633&height=1633",
+              url: "https://bitfinity.network/"
+            }
+          ];
+
+          useEffect(() => {
+            // Need to set window variables for Spline/Lenis if they were global, but here we just append scripts
+            const scriptSpline = document.createElement('script');
+            scriptSpline.type = 'module';
+            scriptSpline.src = "https://unpkg.com/@splinetool/viewer@1.12.16/build/spline-viewer.js";
+            document.body.appendChild(scriptSpline);
+
+            let lenis;
+            const scriptLenis = document.createElement('script');
+            scriptLenis.src = "https://unpkg.com/lenis@1.0.45/dist/lenis.min.js";
+            scriptLenis.async = true;
+            scriptLenis.onload = () => {
+              lenis = new window.Lenis({ lerp: 0.02, smoothWheel: true });
+              const raf = (time) => {
+                lenis.raf(time);
+                requestAnimationFrame(raf);
+              };
+              requestAnimationFrame(raf);
+            };
+            document.body.appendChild(scriptLenis);
+
+            return () => {
+              if (lenis) lenis.destroy();
+              document.body.removeChild(scriptSpline);
+              document.body.removeChild(scriptLenis);
+            };
+          }, []);
+
+          useEffect(() => {
+            setArtists(initialArtists.map(a => ({
+              ...a,
+              x: Math.random() * 80 + 5, 
+              y: Math.random() * 20 + 60, 
+              rotation: Math.random() * 30 - 15,
+              zIndex: Math.floor(Math.random() * 10) + 20,
+              isMatched: false
+            })));
+          }, []);
+
+          useEffect(() => {
+            if (Object.keys(matches).length === initialPaintings.length) {
+              setGameComplete(true);
+            }
+          }, [matches]);
+
+          useEffect(() => {
+            const observer = new IntersectionObserver(
+              (entries) => {
+                entries.forEach((entry) => {
+                  if (entry.isIntersecting) {
+                    if (entry.target === bioRef.current) {
+                       setTimeout(() => {
+                         setIsBioExpanded(true);
+                       }, 1000);
+                    }
+                    const index = parseInt(entry.target.getAttribute('data-index'));
+                    if (!isNaN(index)) {
+                      setActiveProject(index);
+                    }
+                  }
+                });
+              },
+              { threshold: 0.5 } 
+            );
+
+            if (bioRef.current) observer.observe(bioRef.current);
+            projects.forEach((_, index) => {
+              const el = document.getElementById(`project-${index}`);
+              if (el) observer.observe(el);
+            });
+
+            return () => observer.disconnect();
+          }, []);
+
+          useEffect(() => {
+            if (particles.length === 0) return;
+
+            let animationId;
+            const updateParticles = () => {
+              setParticles(prev => prev.map(p => ({
+                ...p,
+                x: p.x + p.vx,
+                y: p.y + p.vy,
+                vy: p.vy + 0.5, 
+                life: p.life - 0.02
+              })).filter(p => p.life > 0));
+              
+              animationId = requestAnimationFrame(updateParticles);
+            };
+            
+            animationId = requestAnimationFrame(updateParticles);
+            return () => cancelAnimationFrame(animationId);
+          }, [particles.length]);
+
+          const spawnConfetti = (x, y) => {
+            const colors = ['#f44336', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5', '#2196f3', '#03a9f4', '#00bcd4', '#009688', '#4caf50', '#8bc34a', '#cddc39', '#ffeb3b', '#ffc107', '#ff9800', '#ff5722'];
+            const newParticles = Array.from({ length: 40 }).map((_, i) => ({
+              id: Date.now() + i + Math.random(),
+              x: x,
+              y: y,
+              vx: (Math.random() - 0.5) * 15,
+              vy: (Math.random() - 0.5) * 15 - 10,
+              color: colors[Math.floor(Math.random() * colors.length)],
+              life: 1.0,
+              size: Math.random() * 8 + 4
+            }));
+            setParticles(prev => [...prev, ...newParticles]);
+          };
+
+          useEffect(() => {
+            const handleScroll = () => {
+              setScrollY(window.scrollY);
+              if (window.scrollY > window.innerHeight * 0.8) {
+                setIsScrolled(true);
+              } else {
+                setIsScrolled(false);
+              }
+            };
+
+            const handleMouseMove = (e) => {
+              setMousePos({
+                x: (e.clientX / window.innerWidth) * 2 - 1,
+                y: (e.clientY / window.innerHeight) * 2 - 1
+              });
+              setCursorPos({ x: e.clientX, y: e.clientY });
+
+              if (window.scrollY < window.innerHeight) {
+                const dist = Math.hypot(
+                  e.clientX - lastTrailPos.current.x, 
+                  e.clientY - lastTrailPos.current.y
+                );
+                if (dist > 60) {
+                  const id = Date.now();
+                  const src = trailImages[trailIndex.current % trailImages.length];
+                  trailIndex.current += 1;
+                  lastTrailPos.current = { x: e.clientX, y: e.clientY };
+                  
+                  const newTrailItem = { 
+                    x: e.clientX, y: e.clientY, id, src, rotation: Math.random() * 30 - 15 
+                  };
+                  setTrail(prev => [...prev, newTrailItem]);
+                  setTimeout(() => setTrail(prev => prev.filter(item => item.id !== id)), 1200);
+                }
+              }
+
+              if (draggedArtist !== null) {
+                const container = document.getElementById('game-container');
+                if (container) {
+                  const rect = container.getBoundingClientRect();
+                  const xPercent = ((e.clientX - rect.left - dragOffset.x) / rect.width) * 100;
+                  const yPercent = ((e.clientY - rect.top - dragOffset.y) / rect.height) * 100;
+
+                  setArtists(prev => prev.map(a => {
+                    if (a.id === draggedArtist) {
+                      return { ...a, x: xPercent, y: yPercent };
+                    }
+                    return a;
+                  }));
+                }
+              }
+            };
+
+            const handleMouseUp = (e) => {
+              if (draggedArtist !== null) {
+                const artist = artists.find(a => a.id === draggedArtist);
+                
+                Object.keys(paintingRefs.current).forEach(pId => {
+                  const el = paintingRefs.current[pId];
+                  if (!el) return;
+                  const pRect = el.getBoundingClientRect();
+                  if (
+                    e.clientX >= pRect.left && 
+                    e.clientX <= pRect.right && 
+                    e.clientY >= pRect.top && 
+                    e.clientY <= pRect.bottom
+                  ) {
+                    const painting = initialPaintings.find(p => p.id === pId);
+                    if (painting && painting.matchId === artist.matchId) {
+                      setMatches(prev => ({ ...prev, [pId]: artist }));
+                      setArtists(prev => prev.map(a => a.id === draggedArtist ? { ...a, isMatched: true } : a));
+                      spawnConfetti(pRect.left + pRect.width / 2, pRect.top + pRect.height / 2);
+                    }
+                  }
+                });
+                setDraggedArtist(null);
+              }
+            };
+
+            window.addEventListener('scroll', handleScroll);
+            window.addEventListener('mousemove', handleMouseMove);
+            window.addEventListener('mouseup', handleMouseUp);
+            
+            return () => {
+              window.removeEventListener('scroll', handleScroll);
+              window.removeEventListener('mousemove', handleMouseMove);
+              window.removeEventListener('mouseup', handleMouseUp);
+            };
+          }, [draggedArtist, dragOffset, artists]);
+
+          const startDrag = (e, id) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const artist = artists.find(a => a.id === id);
+            if (artist.isMatched) return;
+
+            const container = document.getElementById('game-container');
+            if (container) {
+              const rect = container.getBoundingClientRect();
+              const pixelX = (artist.x / 100) * rect.width;
+              const pixelY = (artist.y / 100) * rect.height;
+
+              setDragOffset({
+                x: e.clientX - rect.left - pixelX,
+                y: e.clientY - rect.top - pixelY
+              });
+              setDraggedArtist(id);
+              setHighestZ(prev => prev + 1);
+              setArtists(prev => prev.map(a => a.id === id ? { ...a, zIndex: highestZ + 1 } : a));
+            }
+          };
+
+          const scrollToSection = (id) => {
+            const element = document.getElementById(id);
+            if (element) {
+              element.scrollIntoView({ behavior: 'smooth' });
+              setMobileMenuOpen(false);
+            }
+          };
+
+          return (
+            <div className="relative min-h-screen font-serif selection:bg-orange-500 selection:text-white cursor-none-if-hovering-hero">
+              <RippleEffect />
+              
+              <style>{`
+                @import url('
