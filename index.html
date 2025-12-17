@@ -12,7 +12,7 @@
       "imports": {
         "react": "https://esm.sh/react@18.2.0",
         "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
-        "lucide-react": "https://esm.sh/lucide-react"
+        "lucide-react": "https://esm.sh/lucide-react@0.263.1"
       }
     }
     </script>
@@ -20,12 +20,12 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
     <style>
-        /* Custom scrollbar hiding if needed */
+        body { margin: 0; background-color: black; color: white; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
 </head>
-<body class="bg-black text-white">
+<body>
     <div id="root"></div>
 
     <script type="text/babel" data-type="module">
@@ -33,7 +33,7 @@
         import { createRoot } from 'react-dom/client';
         import { ArrowUpRight, Mail, Linkedin, Twitter, Download, Menu, X, ChevronDown, Volume2, VolumeX } from 'lucide-react';
 
-        // --- RIPPLE EFFECT COMPONENT ---
+        // --- RIPPLE EFFECT ---
         const RippleEffect = () => {
           useEffect(() => {
             let renderer, scene, camera, simScene, simMaterial, renderMaterial;
@@ -43,7 +43,6 @@
             let animationId;
             let width, height;
 
-            // Load Three.js dynamically
             const script = document.createElement('script');
             script.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js';
             script.async = true;
@@ -98,7 +97,6 @@
                     pressure += delta * pVel;
                     
                     pVel -= 0.005 * delta * pressure;
-                    
                     pVel *= 1.0 - 0.018 * delta; 
                     pressure *= 0.990;           
                     
@@ -110,9 +108,7 @@
                         }
                     }
                     
-                    gl_FragColor = vec4(pressure, pVel, 
-                        (p_right - p_left) / 2.0, 
-                        (p_up - p_down) / 2.0);
+                    gl_FragColor = vec4(pressure, pVel, (p_right - p_left) / 2.0, (p_up - p_down) / 2.0);
                 }
               `;
 
@@ -221,12 +217,10 @@
               const onResize = () => {
                 const newWidth = window.innerWidth * window.devicePixelRatio;
                 const newHeight = window.innerHeight * window.devicePixelRatio;
-
                 renderer.setSize(window.innerWidth, window.innerHeight);
                 rtA.setSize(newWidth, newHeight);
                 rtB.setSize(newWidth, newHeight);
                 simMaterial.uniforms.resolution.value.set(newWidth, newHeight);
-
                 canvas.width = newWidth;
                 canvas.height = newHeight;
                 ctx.clearRect(0, 0, newWidth, newHeight);
@@ -239,58 +233,37 @@
                 if(simMaterial) simMaterial.uniforms.mouse.value.set(mouse.x, mouse.y);
               };
 
-              const onTouchMove = (e) => {
-                if (e.touches.length > 0) {
-                  const touch = e.touches[0];
-                  mouse.x = touch.clientX * window.devicePixelRatio;
-                  mouse.y = (window.innerHeight - touch.clientY) * window.devicePixelRatio;
-                  if(simMaterial) simMaterial.uniforms.mouse.value.set(mouse.x, mouse.y);
-                }
-              };
-
               window.addEventListener('resize', onResize);
               window.addEventListener('mousemove', onMouseMove);
-              window.addEventListener('touchmove', onTouchMove, { passive: true });
 
               const animate = () => {
                 simMaterial.uniforms.frame.value = frame++;
                 simMaterial.uniforms.time.value = performance.now() / 1000;
-
                 simMaterial.uniforms.textureA.value = rtA.texture;
                 renderer.setRenderTarget(rtB);
                 renderer.render(simScene, camera);
-
                 renderMaterial.uniforms.textureA.value = rtB.texture;
                 renderMaterial.uniforms.textureB.value = textTexture;
                 renderer.setRenderTarget(null);
                 renderer.render(scene, camera);
-
                 const temp = rtA;
                 rtA = rtB;
                 rtB = temp;
-
                 animationId = requestAnimationFrame(animate);
               };
-
               animate();
             };
 
             document.body.appendChild(script);
-
             return () => {
               document.body.removeChild(script);
-              if (renderer && renderer.domElement) {
-                document.body.removeChild(renderer.domElement);
-                renderer.dispose();
-              }
-              if (animationId) cancelAnimationFrame(animationId);
+              if (renderer && renderer.domElement) renderer.dispose();
             };
           }, []);
 
           return null;
         };
 
-        // --- MAIN APP ---
         const App = () => {
           const [isScrolled, setIsScrolled] = useState(false);
           const [scrollY, setScrollY] = useState(0);
@@ -308,7 +281,6 @@
 
           const [trail, setTrail] = useState([]);
           const [particles, setParticles] = useState([]);
-
           const [artists, setArtists] = useState([]);
           const [matches, setMatches] = useState({}); 
           const [draggedArtist, setDraggedArtist] = useState(null);
@@ -322,20 +294,15 @@
             "https://cdn.britannica.com/24/189624-050-F3C5BAA9/Mona-Lisa-oil-wood-panel-Leonardo-da.jpg",
             "https://artincontext.org/wp-content/uploads/2021/06/High-Renaissance.jpg",
             "https://eii38vo2nqq.exactdn.com/web/app/uploads/2022/02/Basso-Rinascimento.jpg?strip=all&lossy=1&ssl=1",
-            "https://kmska.be/_next/image?url=https%3A%2F%2Fproductionbackend.kmska.be%2Fsites%2Fdefault%2Ffiles%2Fstyles%2Flandscape%2Fpublic%2F2021-11%2Frubens-jan-gaspard-gevartius-kmska.jpg%3Fh%3D0da0242e%26itok%3DTVSMUcf-&w=3840&q=75",
-            "https://images.pexels.com/photos/159862/art-school-of-athens-raphael-italian-painter-fresco-159862.jpeg?auto=compress&cs=tinysrgb&dpr=1&w=500",
-            "https://cdn.britannica.com/24/189624-050-F3C5BAA9/Mona-Lisa-oil-wood-panel-Leonardo-da.jpg",
-            "https://artincontext.org/wp-content/uploads/2021/06/High-Renaissance.jpg",
-            "https://eii38vo2nqq.exactdn.com/web/app/uploads/2022/02/Basso-Rinascimento.jpg?strip=all&lossy=1&ssl=1",
             "https://kmska.be/_next/image?url=https%3A%2F%2Fproductionbackend.kmska.be%2Fsites%2Fdefault%2Ffiles%2Fstyles%2Flandscape%2Fpublic%2F2021-11%2Frubens-jan-gaspard-gevartius-kmska.jpg%3Fh%3D0da0242e%26itok%3DTVSMUcf-&w=3840&q=75"
           ];
 
           const initialPaintings = [
-            { id: 'p1', matchId: 1, src: "https://images.pexels.com/photos/159862/art-school-of-athens-raphael-italian-painter-fresco-159862.jpeg?auto=compress&cs=tinysrgb&dpr=1&w=500", label: "The School of Athens", summary: "This masterpiece represents Philosophy. It gathers the greatest minds of antiquity, including Plato and Aristotle, in a grand architectural setting." },
-            { id: 'p2', matchId: 2, src: "https://cdn.britannica.com/24/189624-050-F3C5BAA9/Mona-Lisa-oil-wood-panel-Leonardo-da.jpg", label: "Mona Lisa", summary: "The archetype of the Renaissance portrait. Famous for her enigmatic smile and the masterful use of sfumato that softens the transition between colors." },
-            { id: 'p3', matchId: 3, src: "https://artincontext.org/wp-content/uploads/2021/06/High-Renaissance.jpg", label: "Creation of Adam", summary: "The most iconic fresco of the Sistine Chapel ceiling. It captures the moment God breathes life into Adam, their fingers almost touching." },
-            { id: 'p4', matchId: 4, src: "https://eii38vo2nqq.exactdn.com/web/app/uploads/2022/02/Basso-Rinascimento.jpg?strip=all&lossy=1&ssl=1", label: "Renaissance Masterpiece", summary: "A stunning example of Florentine art, celebrated for its delicate lines, mythological symbolism, and ethereal beauty." },
-            { id: 'p5', matchId: 5, src: "https://kmska.be/_next/image?url=https%3A%2F%2Fproductionbackend.kmska.be%2Fsites%2Fdefault%2Ffiles%2Fstyles%2Flandscape%2Fpublic%2F2021-11%2Frubens-jan-gaspard-gevartius-kmska.jpg%3Fh%3D0da0242e%26itok%3DTVSMUcf-&w=3840&q=75", label: "Portrait of Gevartius", summary: "A vivid portrait of the scholar Jan Caspar Gevartius. It demonstrates the artist's incredible ability to render skin tones and intellectual depth." },
+            { id: 'p1', matchId: 1, src: "https://images.pexels.com/photos/159862/art-school-of-athens-raphael-italian-painter-fresco-159862.jpeg?auto=compress&cs=tinysrgb&dpr=1&w=500", label: "The School of Athens", summary: "This masterpiece represents Philosophy." },
+            { id: 'p2', matchId: 2, src: "https://cdn.britannica.com/24/189624-050-F3C5BAA9/Mona-Lisa-oil-wood-panel-Leonardo-da.jpg", label: "Mona Lisa", summary: "The archetype of the Renaissance portrait." },
+            { id: 'p3', matchId: 3, src: "https://artincontext.org/wp-content/uploads/2021/06/High-Renaissance.jpg", label: "Creation of Adam", summary: "The most iconic fresco of the Sistine Chapel ceiling." },
+            { id: 'p4', matchId: 4, src: "https://eii38vo2nqq.exactdn.com/web/app/uploads/2022/02/Basso-Rinascimento.jpg?strip=all&lossy=1&ssl=1", label: "Renaissance Masterpiece", summary: "A stunning example of Florentine art." },
+            { id: 'p5', matchId: 5, src: "https://kmska.be/_next/image?url=https%3A%2F%2Fproductionbackend.kmska.be%2Fsites%2Fdefault%2Ffiles%2Fstyles%2Flandscape%2Fpublic%2F2021-11%2Frubens-jan-gaspard-gevartius-kmska.jpg%3Fh%3D0da0242e%26itok%3DTVSMUcf-&w=3840&q=75", label: "Portrait of Gevartius", summary: "A vivid portrait of the scholar Jan Caspar Gevartius." },
           ];
 
           const initialArtists = [
@@ -346,78 +313,30 @@
             { id: 'a5', matchId: 5, src: "https://d3vjn2zm46gms2.cloudfront.net/blogs/2014/10/27010656/peter-paul-rubens-facts-secrets.jpg", label: "Peter Paul Rubens", desc: "Flemish Baroque" },
           ];
 
-          const contactData = {
-            email: "reachout@yogindersuria.live",
-            twitter: "https://x.com/suriagraphics",
-            linkedin: "https://www.linkedin.com/in/yogi-suria-a8b787316/",
-            location: "India"
-          };
-
           const projects = [
-            {
-              id: 1,
-              title: "P2P.org",
-              category: "Brand and Motion Design",
-              description: "Contributed to brand design efforts across social media, motion graphics, and client offers during a period when the company surpassed $10B in TVL.",
-              stats: "$10B+ TVL",
-              image: "https://framerusercontent.com/images/c2fFBSMJhNsXno07r9aLiE9IGwM.png?width=1633&height=1633",
-              url: "https://www.p2p.org/"
-            },
-            {
-              id: 2,
-              title: "Kelp DAO",
-              category: "Brand and Motion Design",
-              description: "Contributed to brand and motion design initiatives during a growth phase where Kelp DAO's TVL increased from $900M to over $1.2B. Produced video assets for partnerships.",
-              stats: "$1.2B TVL",
-              image: "https://www.nftgators.com/wp-content/uploads/2024/05/Kelp-DAO.png",
-              url: "https://kerneldao.com/kelp/"
-            },
-            {
-              id: 3,
-              title: "Blockwiz",
-              category: "UIUX Design",
-              description: "Led the redesign of 40+ landing pages within just two months, contributing to generating over $250K in revenue.",
-              stats: "$250K+ Revenue",
-              image: "https://framerusercontent.com/images/4quSKwxzYwx7ZZGy47KRCIGJM.png?width=1633&height=1633",
-              url: "https://www.linkedin.com/company/blockwiz/"
-            },
-            {
-              id: 4,
-              title: "Bitfinity Network",
-              category: "Graphic Design",
-              description: "Supported marketing efforts as a generalist designer during their $7M+ fundraising phase, working across motion and 3D.",
-              stats: "$7M+ Raised",
-              image: "https://framerusercontent.com/images/MP5IlCLDqUYkSeHrfqc2RAspM.png?width=1633&height=1633",
-              url: "https://bitfinity.network/"
-            }
+            { id: 1, title: "P2P.org", category: "Brand Design", stats: "$10B+ TVL", image: "https://framerusercontent.com/images/c2fFBSMJhNsXno07r9aLiE9IGwM.png?width=1633&height=1633", url: "https://www.p2p.org/" },
+            { id: 2, title: "Kelp DAO", category: "Motion Design", stats: "$1.2B TVL", image: "https://www.nftgators.com/wp-content/uploads/2024/05/Kelp-DAO.png", url: "https://kerneldao.com/kelp/" },
+            { id: 3, title: "Blockwiz", category: "UIUX Design", stats: "$250K+ Revenue", image: "https://framerusercontent.com/images/4quSKwxzYwx7ZZGy47KRCIGJM.png?width=1633&height=1633", url: "https://www.linkedin.com/company/blockwiz/" },
+            { id: 4, title: "Bitfinity Network", category: "Graphic Design", stats: "$7M+ Raised", image: "https://framerusercontent.com/images/MP5IlCLDqUYkSeHrfqc2RAspM.png?width=1633&height=1633", url: "https://bitfinity.network/" }
           ];
 
           useEffect(() => {
-            // Need to set window variables for Spline/Lenis if they were global, but here we just append scripts
             const scriptSpline = document.createElement('script');
             scriptSpline.type = 'module';
             scriptSpline.src = "https://unpkg.com/@splinetool/viewer@1.12.16/build/spline-viewer.js";
             document.body.appendChild(scriptSpline);
-
+            
             let lenis;
             const scriptLenis = document.createElement('script');
             scriptLenis.src = "https://unpkg.com/lenis@1.0.45/dist/lenis.min.js";
             scriptLenis.async = true;
             scriptLenis.onload = () => {
               lenis = new window.Lenis({ lerp: 0.02, smoothWheel: true });
-              const raf = (time) => {
-                lenis.raf(time);
-                requestAnimationFrame(raf);
-              };
+              const raf = (time) => { lenis.raf(time); requestAnimationFrame(raf); };
               requestAnimationFrame(raf);
             };
             document.body.appendChild(scriptLenis);
-
-            return () => {
-              if (lenis) lenis.destroy();
-              document.body.removeChild(scriptSpline);
-              document.body.removeChild(scriptLenis);
-            };
+            return () => { if(lenis) lenis.destroy(); };
           }, []);
 
           useEffect(() => {
@@ -432,71 +351,48 @@
           }, []);
 
           useEffect(() => {
-            if (Object.keys(matches).length === initialPaintings.length) {
-              setGameComplete(true);
-            }
+             if (Object.keys(matches).length === initialPaintings.length) setGameComplete(true);
           }, [matches]);
 
           useEffect(() => {
-            const observer = new IntersectionObserver(
-              (entries) => {
+            const observer = new IntersectionObserver((entries) => {
                 entries.forEach((entry) => {
                   if (entry.isIntersecting) {
-                    if (entry.target === bioRef.current) {
-                       setTimeout(() => {
-                         setIsBioExpanded(true);
-                       }, 1000);
-                    }
+                    if (entry.target === bioRef.current) setTimeout(() => setIsBioExpanded(true), 1000);
                     const index = parseInt(entry.target.getAttribute('data-index'));
-                    if (!isNaN(index)) {
-                      setActiveProject(index);
-                    }
+                    if (!isNaN(index)) setActiveProject(index);
                   }
                 });
-              },
-              { threshold: 0.5 } 
-            );
-
+              }, { threshold: 0.5 });
             if (bioRef.current) observer.observe(bioRef.current);
             projects.forEach((_, index) => {
               const el = document.getElementById(`project-${index}`);
               if (el) observer.observe(el);
             });
-
             return () => observer.disconnect();
           }, []);
 
           useEffect(() => {
             if (particles.length === 0) return;
-
             let animationId;
             const updateParticles = () => {
               setParticles(prev => prev.map(p => ({
-                ...p,
-                x: p.x + p.vx,
-                y: p.y + p.vy,
-                vy: p.vy + 0.5, 
-                life: p.life - 0.02
+                ...p, x: p.x + p.vx, y: p.y + p.vy, vy: p.vy + 0.5, life: p.life - 0.02
               })).filter(p => p.life > 0));
-              
               animationId = requestAnimationFrame(updateParticles);
             };
-            
             animationId = requestAnimationFrame(updateParticles);
             return () => cancelAnimationFrame(animationId);
           }, [particles.length]);
 
           const spawnConfetti = (x, y) => {
-            const colors = ['#f44336', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5', '#2196f3', '#03a9f4', '#00bcd4', '#009688', '#4caf50', '#8bc34a', '#cddc39', '#ffeb3b', '#ffc107', '#ff9800', '#ff5722'];
+            const colors = ['#f44336', '#e91e63', '#9c27b0', '#673ab7', '#3f51b5', '#2196f3', '#03a9f4'];
             const newParticles = Array.from({ length: 40 }).map((_, i) => ({
               id: Date.now() + i + Math.random(),
-              x: x,
-              y: y,
-              vx: (Math.random() - 0.5) * 15,
-              vy: (Math.random() - 0.5) * 15 - 10,
+              x: x, y: y,
+              vx: (Math.random() - 0.5) * 15, vy: (Math.random() - 0.5) * 15 - 10,
               color: colors[Math.floor(Math.random() * colors.length)],
-              life: 1.0,
-              size: Math.random() * 8 + 4
+              life: 1.0, size: Math.random() * 8 + 4
             }));
             setParticles(prev => [...prev, ...newParticles]);
           };
@@ -504,86 +400,56 @@
           useEffect(() => {
             const handleScroll = () => {
               setScrollY(window.scrollY);
-              if (window.scrollY > window.innerHeight * 0.8) {
-                setIsScrolled(true);
-              } else {
-                setIsScrolled(false);
-              }
+              setIsScrolled(window.scrollY > window.innerHeight * 0.8);
             };
-
             const handleMouseMove = (e) => {
-              setMousePos({
-                x: (e.clientX / window.innerWidth) * 2 - 1,
-                y: (e.clientY / window.innerHeight) * 2 - 1
-              });
+              setMousePos({ x: (e.clientX / window.innerWidth) * 2 - 1, y: (e.clientY / window.innerHeight) * 2 - 1 });
               setCursorPos({ x: e.clientX, y: e.clientY });
-
               if (window.scrollY < window.innerHeight) {
-                const dist = Math.hypot(
-                  e.clientX - lastTrailPos.current.x, 
-                  e.clientY - lastTrailPos.current.y
-                );
+                const dist = Math.hypot(e.clientX - lastTrailPos.current.x, e.clientY - lastTrailPos.current.y);
                 if (dist > 60) {
                   const id = Date.now();
                   const src = trailImages[trailIndex.current % trailImages.length];
-                  trailIndex.current += 1;
+                  trailIndex.current++;
                   lastTrailPos.current = { x: e.clientX, y: e.clientY };
-                  
-                  const newTrailItem = { 
-                    x: e.clientX, y: e.clientY, id, src, rotation: Math.random() * 30 - 15 
-                  };
-                  setTrail(prev => [...prev, newTrailItem]);
+                  setTrail(prev => [...prev, { x: e.clientX, y: e.clientY, id, src, rotation: Math.random() * 30 - 15 }]);
                   setTimeout(() => setTrail(prev => prev.filter(item => item.id !== id)), 1200);
                 }
               }
-
               if (draggedArtist !== null) {
                 const container = document.getElementById('game-container');
                 if (container) {
                   const rect = container.getBoundingClientRect();
-                  const xPercent = ((e.clientX - rect.left - dragOffset.x) / rect.width) * 100;
-                  const yPercent = ((e.clientY - rect.top - dragOffset.y) / rect.height) * 100;
-
-                  setArtists(prev => prev.map(a => {
-                    if (a.id === draggedArtist) {
-                      return { ...a, x: xPercent, y: yPercent };
-                    }
-                    return a;
-                  }));
+                  setArtists(prev => prev.map(a => a.id === draggedArtist ? {
+                    ...a, x: ((e.clientX - rect.left - dragOffset.x) / rect.width) * 100,
+                    y: ((e.clientY - rect.top - dragOffset.y) / rect.height) * 100
+                  } : a));
                 }
               }
             };
-
             const handleMouseUp = (e) => {
               if (draggedArtist !== null) {
                 const artist = artists.find(a => a.id === draggedArtist);
-                
                 Object.keys(paintingRefs.current).forEach(pId => {
                   const el = paintingRefs.current[pId];
-                  if (!el) return;
-                  const pRect = el.getBoundingClientRect();
-                  if (
-                    e.clientX >= pRect.left && 
-                    e.clientX <= pRect.right && 
-                    e.clientY >= pRect.top && 
-                    e.clientY <= pRect.bottom
-                  ) {
-                    const painting = initialPaintings.find(p => p.id === pId);
-                    if (painting && painting.matchId === artist.matchId) {
-                      setMatches(prev => ({ ...prev, [pId]: artist }));
-                      setArtists(prev => prev.map(a => a.id === draggedArtist ? { ...a, isMatched: true } : a));
-                      spawnConfetti(pRect.left + pRect.width / 2, pRect.top + pRect.height / 2);
+                  if (el) {
+                    const pRect = el.getBoundingClientRect();
+                    if (e.clientX >= pRect.left && e.clientX <= pRect.right && e.clientY >= pRect.top && e.clientY <= pRect.bottom) {
+                       const painting = initialPaintings.find(p => p.id === pId);
+                       if (painting && painting.matchId === artist.matchId) {
+                         setMatches(prev => ({ ...prev, [pId]: artist }));
+                         setArtists(prev => prev.map(a => a.id === draggedArtist ? { ...a, isMatched: true } : a));
+                         spawnConfetti(pRect.left + pRect.width / 2, pRect.top + pRect.height / 2);
+                       }
                     }
                   }
                 });
                 setDraggedArtist(null);
               }
             };
-
             window.addEventListener('scroll', handleScroll);
             window.addEventListener('mousemove', handleMouseMove);
             window.addEventListener('mouseup', handleMouseUp);
-            
             return () => {
               window.removeEventListener('scroll', handleScroll);
               window.removeEventListener('mousemove', handleMouseMove);
@@ -592,38 +458,184 @@
           }, [draggedArtist, dragOffset, artists]);
 
           const startDrag = (e, id) => {
-            e.preventDefault();
-            e.stopPropagation();
+            e.preventDefault(); e.stopPropagation();
             const artist = artists.find(a => a.id === id);
             if (artist.isMatched) return;
-
             const container = document.getElementById('game-container');
             if (container) {
               const rect = container.getBoundingClientRect();
-              const pixelX = (artist.x / 100) * rect.width;
-              const pixelY = (artist.y / 100) * rect.height;
-
-              setDragOffset({
-                x: e.clientX - rect.left - pixelX,
-                y: e.clientY - rect.top - pixelY
-              });
+              setDragOffset({ x: e.clientX - rect.left - (artist.x / 100) * rect.width, y: e.clientY - rect.top - (artist.y / 100) * rect.height });
               setDraggedArtist(id);
-              setHighestZ(prev => prev + 1);
+              setHighestZ(h => h + 1);
               setArtists(prev => prev.map(a => a.id === id ? { ...a, zIndex: highestZ + 1 } : a));
             }
           };
 
           const scrollToSection = (id) => {
             const element = document.getElementById(id);
-            if (element) {
-              element.scrollIntoView({ behavior: 'smooth' });
-              setMobileMenuOpen(false);
-            }
+            if (element) { element.scrollIntoView({ behavior: 'smooth' }); setMobileMenuOpen(false); }
           };
 
           return (
-            <div className="relative min-h-screen font-serif selection:bg-orange-500 selection:text-white cursor-none-if-hovering-hero">
+            <div className="relative min-h-screen font-serif selection:bg-orange-500 selection:text-white">
               <RippleEffect />
-              
               <style>{`
-                @import url('
+                @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital,wght@0,400;1,400&family=Inter:wght@300;400;500;600&display=swap');
+                body { font-family: 'Instrument Serif', serif; }
+                .font-sans { font-family: 'Inter', sans-serif; }
+                .font-serif { font-family: 'Instrument Serif', serif; }
+                @keyframes fadeOut { 0% { opacity: 1; transform: translate(-50%, -50%) rotate(var(--rot)); } 100% { opacity: 0; transform: translate(-50%, -50%) rotate(var(--rot)); } }
+              `}</style>
+              
+              <div className="fixed inset-0 pointer-events-none z-[70]">
+                {particles.map(p => (
+                  <div key={p.id} style={{
+                    position: 'absolute', left: p.x, top: p.y, width: p.size, height: p.size, backgroundColor: p.color, opacity: p.life,
+                    transform: `translate(-50%, -50%) rotate(${p.life * 360}deg)`, borderRadius: '50%'
+                  }}/>
+                ))}
+              </div>
+
+              <div className="fixed inset-0 pointer-events-none z-[6]">
+                {trail.map((item) => (
+                  <img key={item.id} src={item.src} className="absolute w-24 h-auto object-cover rounded shadow-xl"
+                  style={{ left: item.x, top: item.y, '--rot': `${item.rotation}deg`, animation: 'fadeOut 1.2s forwards' }} />
+                ))}
+              </div>
+
+              {hoveredMatchId && matches[hoveredMatchId] && (
+                  <div className="fixed z-[60] pointer-events-none bg-white p-6 rounded shadow-2xl max-w-xs border border-black/10 transition-opacity duration-300 transform"
+                    style={{ left: cursorPos.x + 20, top: cursorPos.y + 20 }}>
+                     <h4 className="font-serif text-2xl mb-2 leading-tight text-black">{initialPaintings.find(p => p.id === hoveredMatchId).label}</h4>
+                     <p className="font-sans text-xs opacity-70 mb-4 leading-relaxed text-black">{initialPaintings.find(p => p.id === hoveredMatchId).summary}</p>
+                     <div className="text-xs font-serif italic text-orange-500 border-t border-gray-100 pt-2">by {matches[hoveredMatchId].label}</div>
+                  </div>
+              )}
+
+              <div className="fixed inset-0 z-0">
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-[-1]">
+                     <div className="flex flex-col items-center gap-2">
+                        <div className="w-6 h-6 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
+                        <p className="text-black font-sans text-xs uppercase tracking-widest opacity-50 animate-pulse">Loading Scene...</p>
+                     </div>
+                </div>
+                <spline-viewer url="https://prod.spline.design/EQHzlukjfGv0BaAG/scene.splinecode" style={{ width: '100%', height: '100%', pointerEvents: 'auto' }}></spline-viewer>
+              </div>
+
+              <div className={`fixed inset-0 z-[5] pointer-events-none transition-colors duration-700 ${isScrolled ? 'text-black' : 'text-white'}`}
+                style={{ transform: `translate(${mousePos.x * -10}px, ${mousePos.y * -10}px)` }}>
+                <svg className={`w-full h-full transition-opacity duration-700 ${isScrolled ? 'opacity-10' : 'opacity-30'}`}>
+                  <circle cx="85%" cy="15%" r="400" fill="none" stroke="currentColor" strokeWidth="1" strokeDasharray="4 4" style={{ transformOrigin: '85% 15%', transform: `rotate(${scrollY * 0.05 + mousePos.x * 5}deg)` }} />
+                  <circle cx="85%" cy="15%" r="380" fill="none" stroke="currentColor" strokeWidth="0.5" opacity="0.5" style={{ transformOrigin: '85% 15%', transform: `rotate(-${scrollY * 0.08 + mousePos.y * 5}deg)` }} />
+                </svg>
+              </div>
+
+              <div className={`relative z-10 pointer-events-none transition-colors duration-700 ${isScrolled ? 'text-black' : 'text-white'}`}>
+                <nav className="absolute top-0 left-0 w-full px-6 py-6 flex justify-between items-center z-50 pointer-events-none">
+                  <div className="absolute inset-0 z-[-1]" style={{ background: 'linear-gradient(to bottom, rgba(255,255,255,0.05) 0%, rgba(0,0,0,0) 100%)', backdropFilter: 'blur(12px)' }}></div>
+                  <div className="pointer-events-auto cursor-pointer" onClick={() => scrollToSection('hero')}>
+                    <h1 className={`text-2xl font-bold tracking-tight transition-colors duration-700 font-serif ${isScrolled ? 'text-black' : 'text-white'}`}>YOGI SURIA</h1>
+                  </div>
+                  <div className="hidden md:flex items-center space-x-8 pointer-events-auto">
+                    {['Projects', 'Playground', 'Contact'].map((item) => (
+                      <button key={item} onClick={() => scrollToSection(item.toLowerCase())} className={`text-base font-medium hover:opacity-60 transition-colors duration-300 uppercase tracking-widest font-serif cursor-pointer ${isScrolled ? 'text-black' : 'text-white'}`}>{item}</button>
+                    ))}
+                    <button onClick={() => setIsMuted(!isMuted)} className={`hover:opacity-60 transition-opacity ${isScrolled ? 'text-black' : 'text-white'}`}>
+                      {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+                    </button>
+                  </div>
+                </nav>
+
+                <section id="hero" className="min-h-screen w-full flex flex-col justify-end pb-24 px-6 md:px-12 pointer-events-none">
+                  <div className="max-w-4xl relative">
+                    <p className="text-sm md:text-base font-medium tracking-widest mb-4 opacity-80 uppercase font-sans">Digital Designer • Web3 Specialist</p>
+                    <div className="pointer-events-auto inline-block">
+                      <h2 className="text-5xl md:text-7xl lg:text-8xl font-normal tracking-tighter leading-[0.9] mb-8 font-serif hover:opacity-90 transition-opacity">Crafting the <br/>Future of Web3</h2>
+                    </div>
+                  </div>
+                  <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce pointer-events-auto cursor-pointer" onClick={() => scrollToSection('projects')}>
+                    <ChevronDown className="w-6 h-6 opacity-50" />
+                  </div>
+                </section>
+
+                <section id="projects" className="min-h-screen w-full py-24 px-6 md:px-12 pointer-events-none">
+                  <div className="mb-20">
+                    <h3 className="text-xs font-bold uppercase tracking-[0.2em] mb-4 opacity-50 font-sans">Selected Works</h3>
+                    <p ref={bioRef} className="text-4xl md:text-6xl max-w-4xl leading-tight font-light font-serif pointer-events-auto cursor-default">
+                      Hi, I'm <span className="relative inline-flex items-center align-middle mx-4 cursor-pointer">
+                        <span className="relative z-10">Yogi</span>
+                        <span className={`relative inline-flex items-center transition-all duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] ${isBioExpanded ? 'w-40 opacity-100 ml-4' : 'w-0 opacity-0 ml-0'}`} style={{ height: '5rem' }}>
+                           <span className="absolute left-0 top-1/2 -translate-y-1/2 flex items-center w-40">
+                              <img src="https://pbs.twimg.com/profile_images/1998797364539305987/zn3gklud_400x400.jpg" alt="Yogi" className="w-24 h-24 rounded-full border-4 border-white shadow-xl object-cover" 
+                                style={{ transform: isBioExpanded ? 'scale(1) rotate(0deg)' : 'scale(0) rotate(15deg)', transition: 'transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)' }} />
+                           </span>
+                        </span>
+                      </span> and I design strategic solutions for the decentralized web ecosystem.
+                    </p>
+                  </div>
+                  <div className="flex flex-col lg:flex-row gap-12 lg:gap-24">
+                    <div className="w-full lg:w-2/3 space-y-32">
+                       {projects.map((project, index) => (
+                         <div id={`project-${index}`} data-index={index} key={project.id} className="group relative">
+                            <div className="relative aspect-[4/3] md:aspect-[16/9] w-full bg-gray-100/10 backdrop-blur-sm rounded-sm overflow-hidden mb-8 shadow-sm group-hover:shadow-md transition-shadow border border-white/20">
+                                <img src={project.image} alt={project.title} className="absolute inset-0 w-full h-full object-cover transition-all duration-700 group-hover:scale-105"/>
+                                <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors duration-500"></div>
+                            </div>
+                            <h3 className="text-3xl font-serif italic mb-3">{project.title}</h3>
+                            <p className="text-lg leading-relaxed opacity-60 font-sans mb-6">{project.description}</p>
+                         </div>
+                       ))}
+                    </div>
+                  </div>
+                </section>
+
+                <section id="playground" className="min-h-screen w-full py-24 px-6 md:px-12 bg-white/80 backdrop-blur-md text-black pointer-events-auto overflow-hidden relative">
+                  <div className="max-w-7xl mx-auto h-full flex flex-col">
+                    <div className="mb-12 pointer-events-auto z-20 relative text-center lg:text-left">
+                       <h2 className="text-6xl md:text-8xl font-light tracking-tighter mb-4 font-serif">The Curator</h2>
+                       <p className="text-lg opacity-60 font-sans max-w-xl mx-auto lg:mx-0">Match the Master to the Masterpiece. Drag the artist to their painting.</p>
+                    </div>
+                    <div id="game-container" className="flex-grow relative w-full h-[70vh] border border-black/10 rounded-lg bg-gray-50/50 overflow-hidden shadow-inner">
+                       <div className="absolute top-10 left-0 w-full flex justify-center gap-4 px-4 z-10">
+                         {initialPaintings.map((painting) => {
+                           const matchedArtist = matches[painting.id];
+                           const isFocused = hoveredMatchId === painting.id;
+                           return (
+                             <div key={painting.id} ref={el => paintingRefs.current[painting.id] = el}
+                               onMouseEnter={() => matchedArtist && setHoveredMatchId(painting.id)}
+                               onMouseLeave={() => setHoveredMatchId(null)}
+                               className={`relative w-1/5 aspect-[3/4] bg-white shadow-xl rounded-sm border border-black/10 transition-all duration-500 ease-out p-2 ${isFocused ? 'scale-125 z-50 shadow-2xl' : 'hover:scale-105'}`}>
+                                <div className="relative w-full h-full overflow-hidden rounded-sm"><img src={painting.src} className="w-full h-full object-cover pointer-events-none select-none"/></div>
+                               {matchedArtist && (<div className="absolute -bottom-4 -right-4 w-12 h-12 rounded-sm overflow-hidden border-2 border-white shadow-md z-20"><img src={matchedArtist.src} className="w-full h-full object-cover"/></div>)}
+                             </div>
+                           );
+                         })}
+                       </div>
+                       {artists.filter(a => !a.isMatched).map((artist) => (
+                         <div key={artist.id} onMouseDown={(e) => startDrag(e, artist.id)} className="absolute cursor-grab active:cursor-grabbing group hover:z-50"
+                           style={{ left: `${artist.x}%`, top: `${artist.y}%`, width: '120px', zIndex: artist.zIndex, height: '120px', transform: `translate(-50%, -50%) rotate(${artist.rotation}deg)` }}>
+                           <div className="relative w-full h-full p-1 bg-white shadow-lg rounded-sm transform transition-transform hover:scale-110 duration-300">
+                             <div className="w-full h-full rounded-sm overflow-hidden border border-black/5"><img src={artist.src} className="w-full h-full object-cover pointer-events-none select-none"/></div>
+                           </div>
+                         </div>
+                       ))}
+                       {gameComplete && <div className="absolute bottom-10 left-0 w-full text-center pointer-events-none z-40 animate-pulse"><h3 className="text-4xl md:text-5xl font-serif italic text-black">Congratulations!</h3></div>}
+                    </div>
+                  </div>
+                </section>
+                
+                <section id="contact" className="py-24 px-6 md:px-12 pointer-events-none bg-white text-black">
+                   <div className="max-w-4xl mx-auto text-center">
+                      <h2 className="text-5xl md:text-7xl lg:text-8xl font-light mb-12 font-serif">Let's build the <br/><span className="italic">next big thing</span>.</h2>
+                   </div>
+                </section>
+              </div>
+            </div>
+          );
+        };
+
+        const root = createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
